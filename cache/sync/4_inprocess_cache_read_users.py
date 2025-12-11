@@ -2,9 +2,6 @@ from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
 from sqlalchemy.orm import declarative_base, Session, relationship
 from sqlalchemy.orm import Mapped
 from typing import List
-import random
-import redis
-import json
 from sqlalchemy.orm import Session, joinedload
 from cachetools import TTLCache
 import time
@@ -19,17 +16,17 @@ engine          = create_engine(
 Base    = declarative_base()
 class User(Base):
     __tablename__                   = "users"
-    id                              = Column(Integer, primary_key=True)
-    name                            = Column(String)
-    age: Mapped[int]                = Column(Integer)
+    id : Mapped[int]                = Column(Integer, primary_key=True)
+    name : Mapped[str]              = Column(String)
+    age : Mapped[int]               = Column(Integer)
     posts : Mapped[List["Post"]]    = relationship(back_populates="user")
     
 class Post(Base):
     __tablename__           = "posts"
-    id                      = Column(Integer, primary_key=True)
-    title                   = Column(String)
-    text                    = Column(String)
-    user_id                 = Column(Integer, ForeignKey("users.id"))
+    id : Mapped[int]        = Column(Integer, primary_key=True)
+    title : Mapped[str]     = Column(String)
+    text : Mapped[str]      = Column(String)
+    user_id : Mapped[int]   = Column(Integer, ForeignKey("users.id"))
     user : Mapped["User"]   = relationship( back_populates="posts")
 
 
@@ -50,7 +47,7 @@ generate_cache(engine, cache_inprocess)
 start = time.perf_counter()
 all_users = []
 
-for uid in range(1, 1001):
+for uid in range(1, 10001):
     cache_key = f"user-{uid}"
     cache_data = cache_inprocess.get(cache_key)
 
@@ -73,6 +70,9 @@ end = time.perf_counter()
 elapsed = end - start
 rps = len(all_users) / elapsed
 
-print(f"Total time: {elapsed:.6f} s")
-print(f"Throughput: {rps:.0f} req/s")
+
+print(f"")
+print(f"In-process          :")
+print(f"Total time          : {elapsed/len(all_users):.10f} s")
+print(f"Throughput          : {rps:.0f} req/s")
 

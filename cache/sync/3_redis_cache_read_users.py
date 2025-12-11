@@ -2,39 +2,47 @@ from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
 from sqlalchemy.orm import declarative_base, Session, relationship
 from sqlalchemy.orm import Mapped
 from typing import List
-import random
 import redis
 import json
-from sqlalchemy.orm import Session, joinedload
 from cachetools import TTLCache
 import time
 from sqlalchemy.engine import Engine
+from sqlalchemy import select
 
-    
+HOST    = "127.0.0.1"
+PORT    = 6379
 db_url  = "sqlite:///data/database.db"
 engine  = create_engine(
     db_url
 )
 Base    = declarative_base()
+
 class User(Base):
     __tablename__                   = "users"
-    id                              = Column(Integer, primary_key=True)
-    name                            = Column(String)
-    age: Mapped[int]                = Column(Integer)
+    id : Mapped[int]                = Column(Integer, primary_key=True)
+    name : Mapped[str]              = Column(String)
+    age : Mapped[int]               = Column(Integer)
     posts : Mapped[List["Post"]]    = relationship(back_populates="user")
+    
 class Post(Base):
     __tablename__           = "posts"
-    id                      = Column(Integer, primary_key=True)
-    title                   = Column(String)
-    text                    = Column(String)
-    user_id                 = Column(Integer, ForeignKey("users.id"))
+    id : Mapped[int]        = Column(Integer, primary_key=True)
+    title : Mapped[str]     = Column(String)
+    text : Mapped[str]      = Column(String)
+    user_id : Mapped[int]   = Column(Integer, ForeignKey("users.id"))
     user : Mapped["User"]   = relationship( back_populates="posts")
 
-from sqlalchemy import select
+pool = redis.ConnectionPool(
+    host=HOST,
+    port=PORT,
+    db=0,
+    decode_responses=True,
+    max_connections=50,
+)
 
+cache_redis         = redis.Redis(connection_pool=pool)
+cache_inprocess     = TTLCache(maxsize=100_000, ttl=60) 
 
-cache_redis     = redis.Redis(host='127.0.0.1', port=6379, db=0, decode_responses=True)
-cache_inprocess = TTLCache(maxsize=100, ttl=60) 
 def generate_cache(engine : Engine, cache_inprocess : TTLCache, cache_redis : redis.Redis) -> None:
     with Session(engine) as session:
         users = session.query(User)
@@ -52,7 +60,7 @@ generate_cache(engine, cache_inprocess, cache_redis)
 
 start = time.perf_counter()
 all_users = []
-for uid in range(1,1001):
+for uid in range(1,10001):
     cache_key = f"user-{uid}"
     cache_data = cache_redis.get(cache_key)
     if cache_data is None:
@@ -73,6 +81,13 @@ for uid in range(1,1001):
         })
         
 end     = time.perf_counter()
-diff    = (end - start)/len(all_users)
-print(f"Redis Cache Took        : {diff:.8f} seconds")
+elapsed = end - start
+rps = len(all_users) / elapsed
+
+
+print(f"")
+print(f"Redis Cache         :")
+print(f"Total time          : {elapsed/len(all_users):.10f} s")
+print(f"Throughput          : {rps:.0f} req/s")
+
 
