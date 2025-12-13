@@ -9,13 +9,22 @@ from sqlalchemy.orm import Session, joinedload
 from cachetools import TTLCache
 import time
 
-db_url  = "sqlite:///data/database.db"
-engine  = create_engine(
+# db_url  = "sqlite:///data/database.db"
+# engine  = create_engine(
+#     db_url,
+#     execution_options={
+#         "compiled_cache": None
+#     }
+# )
+# PostgreSQL connection URL
+db_url = "postgresql+psycopg2://myuser:password123@localhost:5432/mydb"
+engine = create_engine(
     db_url,
     execution_options={
         "compiled_cache": None
     }
 )
+
 Base    = declarative_base()
 
 class User(Base):
@@ -36,7 +45,7 @@ class Post(Base):
 Base.metadata.drop_all(engine) 
 Base.metadata.create_all(engine)
 
-user_population = 10000
+user_population = 5000
 with Session(engine) as session:
     users = [User(name=f"User {index}",age=random.randint(20, 40)) for index in range(user_population)]
     session.add_all(users)

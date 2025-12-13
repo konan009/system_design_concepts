@@ -30,7 +30,6 @@ class Post(Base):
     user_id : Mapped[int]   = Column(Integer, ForeignKey("users.id"))
     user : Mapped["User"]   = relationship(back_populates="posts", )
     
-
 DB_USER     = "myuser"
 DB_PW       = "password123"
 DB_HOST     = "localhost"
@@ -41,17 +40,24 @@ engine      = create_async_engine(
     db_url
 )
 
-
 AsyncSessionLocal   = sessionmaker(
     engine, expire_on_commit=False, class_=AsyncSession
 )
 
-async def fetch_user(uid : int ) -> dict:
-    async with AsyncSessionLocal() as session:
-        stmt = select(User).where(User.id == uid)
-        result = await session.execute(stmt)
-        db_user = result.scalar_one()
-        return {"id": db_user.id, "name": db_user.name, "age": db_user.age}
+from sqlalchemy import text
+
+async def fetch_user(uid : int) -> dict:
+    async with engine.connect() as connection:
+        stmt        = text("SELECT id, name, age FROM users WHERE id = :uid")
+        result      = await connection.execute(stmt, {"uid": uid})
+        db_user_row = result.fetchone()
+        if db_user_row is None:
+            raise Exception(f"User with ID {uid} not found.")
+        return {
+            "id": db_user_row.id, 
+            "name": db_user_row.name,
+            "age": db_user_row.age
+        }
 
 async def main() -> None:
     start       = time.perf_counter()
@@ -64,7 +70,8 @@ async def main() -> None:
     elapsed = end - start
     rps     = len(all_users) / elapsed
 
-    print(f"Direct disk read    :")
+    print(f" ")
+    print(f"w/o ORM             :")
     print(f"Total time          : {elapsed/len(all_users):.10f} s")
     print(f"Throughput          : {rps:.0f} req/s")
 

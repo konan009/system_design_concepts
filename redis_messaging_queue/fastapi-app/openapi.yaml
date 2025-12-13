@@ -1,0 +1,26 @@
+components:
+  schemas:
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - price
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        price:
+          type: number
+          format: float
+
+    ProductUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+          format: float

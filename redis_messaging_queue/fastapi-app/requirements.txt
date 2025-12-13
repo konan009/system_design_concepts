@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-dotenv  
+requests      
+prometheus-fastapi-instrumentator
+sqlalchemy
+redis
+asyncpg
+psycopg2-binary
+structlog
+databases[postgresql]
+rq[async]
+aioredis

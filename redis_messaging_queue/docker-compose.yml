@@ -1,0 +1,50 @@
+services:
+  backend-app-1:
+    container_name: backend-app-1
+    build:
+      context: ./fastapi-app
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./fastapi-app:/app  
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: "1" 
+    networks:
+      - backend-network
+  backend-app-2:
+    container_name: backend-app-2
+    build:
+      context: ./fastapi-app
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./fastapi-app:/app  
+    command: uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+    depends_on:
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+
+    networks:
+      - backend-network
+  redis:
+      image: redis:7-alpine
+      container_name: redis
+      ports:
+        - "6379:6379"
+      command: ["redis-server", "--maxmemory", "256m", "--save", "", "--appendonly", "no"]
+
+      networks:
+        - backend-network
+networks:
+  backend-network:
+

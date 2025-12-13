@@ -17,7 +17,7 @@ class User(Base):
     id : Mapped[int]                = Column(Integer, primary_key=True)
     name : Mapped[str]              = Column(String)
     age : Mapped[int]               = Column(Integer)
-    posts : Mapped[List["Post"]]    = relationship(back_populates="user")
+    posts : Mapped[List["Post"]]    = relationship(back_populates="user",lazy="selectin")
     
 class Post(Base):
     __tablename__           = "posts"
@@ -28,12 +28,17 @@ class Post(Base):
     user : Mapped["User"]   = relationship( back_populates="posts")
 
 cache_inprocess = TTLCache(maxsize=10_000, ttl=60) 
-db_url  = "sqlite+aiosqlite:///data/database.db"
-engine  = create_async_engine(    
-    db_url,
-    echo=False,
-    future=True
+
+DB_USER     = "myuser"
+DB_PW       = "password123"
+DB_HOST     = "localhost"
+PORT_NO     = "5432"
+
+db_url      = f"postgresql+asyncpg://{DB_USER}:{DB_PW}@{DB_HOST}:{PORT_NO}/mydb"
+engine      = create_async_engine(
+    db_url
 )
+
 
 AsyncSessionLocal = sessionmaker(
     engine, expire_on_commit=False, class_=AsyncSession
@@ -63,7 +68,8 @@ async def get_user_data(uid):
             user_data = {
                 'id': db_user.id,
                 'name': db_user.name,
-                'age': db_user.age
+                'age': db_user.age,
+                'posts' : [ {"title" : post.title, "user_id" : post.user_id, "text" : post.text }  for post in db_user.posts ]
             }
     else:
         user_data = cache_data
@@ -71,10 +77,10 @@ async def get_user_data(uid):
         
 async def main():  
     await generate_cache(cache_inprocess)
-    start = time.perf_counter()
-    all_users = []
-
-    for uid in range(1, 10001):
+    start               = time.perf_counter()
+    all_users           = []
+    user_population     = 5000
+    for uid in range(1, user_population+1):
         user_data = await get_user_data(uid)
         all_users.append(user_data)
 

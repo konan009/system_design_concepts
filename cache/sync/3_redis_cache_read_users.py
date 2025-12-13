@@ -3,7 +3,7 @@ from sqlalchemy.orm import declarative_base, Session, relationship
 from sqlalchemy.orm import Mapped
 from typing import List
 import redis
-import json
+import orjson
 from cachetools import TTLCache
 import time
 from sqlalchemy.engine import Engine
@@ -11,10 +11,8 @@ from sqlalchemy import select
 
 HOST    = "127.0.0.1"
 PORT    = 6379
-db_url  = "sqlite:///data/database.db"
-engine  = create_engine(
-    db_url
-)
+
+
 Base    = declarative_base()
 
 class User(Base):
@@ -40,6 +38,16 @@ pool = redis.ConnectionPool(
     max_connections=50,
 )
 
+DB_USER     = "myuser"
+DB_PW       = "password123"
+DB_HOST     = "localhost"
+PORT_NO     = "5432"
+
+db_url      = f"postgresql+psycopg2://{DB_USER}:{DB_PW}@{DB_HOST}:{PORT_NO}/mydb"
+engine = create_engine(
+    db_url
+)
+
 cache_redis         = redis.Redis(connection_pool=pool)
 cache_inprocess     = TTLCache(maxsize=100_000, ttl=60) 
 
@@ -53,14 +61,14 @@ def generate_cache(engine : Engine, cache_inprocess : TTLCache, cache_redis : re
                 "name": user.name,
                 "age": user.age
             }
-            cache_redis.set(cache_key, json.dumps(data), ex=120)
+            cache_redis.set(cache_key, orjson.dumps(data), ex=120)
             cache_inprocess[cache_key] = data
 
 generate_cache(engine, cache_inprocess, cache_redis)
-
+user_population     = 5000
 start = time.perf_counter()
 all_users = []
-for uid in range(1,10001):
+for uid in range(1,user_population+1):
     cache_key = f"user-{uid}"
     cache_data = cache_redis.get(cache_key)
     if cache_data is None:
@@ -73,7 +81,7 @@ for uid in range(1,10001):
             'age': db_user.age
         })
     else:
-        user_data = json.loads(cache_data)
+        user_data = orjson.loads(cache_data)
         all_users.append({
             'id': user_data['id'],
             'name': user_data['name'],

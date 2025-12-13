@@ -25,14 +25,20 @@ class Post(Base):
 
 
 
-db_url  = "sqlite:///data/database.db"
-engine  = create_engine(
+DB_USER     = "myuser"
+DB_PW       = "password123"
+DB_HOST     = "localhost"
+PORT_NO     = "5432"
+
+db_url      = f"postgresql+psycopg2://{DB_USER}:{DB_PW}@{DB_HOST}:{PORT_NO}/mydb"
+engine = create_engine(
     db_url
 )
 
-start = time.perf_counter()
-all_users = []
-for uid in range(1,10001):
+user_population     = 5000
+start               = time.perf_counter()
+all_users           = []
+for uid in range(1,user_population+1):
     with Session(engine) as session:
         stmt    = select(User).where(User.id == str(uid))
         db_user = session.execute(stmt).scalar_one()
@@ -41,8 +47,8 @@ for uid in range(1,10001):
             'name': db_user.name,
             'age': db_user.age
         })  
+        
 end = time.perf_counter()
-
 elapsed = end - start
 rps = len(all_users) / elapsed
 

@@ -9,8 +9,17 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import sessionmaker
 import uvloop
 import redis.asyncio as redis
-import json
 import time
+
+# import json
+# serializer_fn   = json.dumps
+# deserializer_fn = json.loads
+
+import orjson
+serializer_fn   = orjson.dumps
+deserializer_fn = orjson.loads
+
+
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 HOST    = "127.0.0.1"
@@ -22,7 +31,7 @@ class User(Base):
     id : Mapped[int]                = Column(Integer, primary_key=True)
     name : Mapped[str]              = Column(String)
     age : Mapped[int]               = Column(Integer)
-    posts : Mapped[List["Post"]]    = relationship(back_populates="user")
+    posts : Mapped[List["Post"]]    = relationship(back_populates="user",lazy="selectin")
     
 class Post(Base):
     __tablename__           = "posts"
@@ -32,12 +41,16 @@ class Post(Base):
     user_id : Mapped[int]   = Column(Integer, ForeignKey("users.id"))
     user : Mapped["User"]   = relationship( back_populates="posts")
 
-db_url  = "sqlite+aiosqlite:///data/database.db"
-engine  = create_async_engine(    
-    db_url,
-    echo=False,
-    future=True
+DB_USER     = "myuser"
+DB_PW       = "password123"
+DB_HOST     = "localhost"
+PORT_NO     = "5432"
+
+db_url      = f"postgresql+asyncpg://{DB_USER}:{DB_PW}@{DB_HOST}:{PORT_NO}/mydb"
+engine      = create_async_engine(
+    db_url
 )
+
 
 AsyncSessionLocal = sessionmaker(
     engine, expire_on_commit=False, class_=AsyncSession
@@ -62,9 +75,12 @@ async def generate_cache(cache_redis : redis.Redis) -> None:
             data = {
                 "id": user.id,
                 "name": user.name,
-                "age": user.age
+                "age": user.age,
+                "posts": [ 
+                    {"id": post.id, "title": post.title, "text": post.text } for post in user.posts
+                ]
             }
-            await cache_redis.set(cache_key, json.dumps(data), ex=120)
+            await cache_redis.set(cache_key, serializer_fn(data), ex=120)
 
 async def fetch_user(uid: int) -> dict:
     cache_key   = f"user-{uid}"
@@ -76,21 +92,27 @@ async def fetch_user(uid: int) -> dict:
         return {
             'id': db_user.id,
             'name': db_user.name,
-            'age': db_user.age
+            'age': db_user.age,
+            'posts' : [
+                {'id' : post.id, "title": post.title, "text": post.text } for post in db_user.posts
+            ]
         }
     else:
-        user_data = json.loads(cache_data)
+        user_data = deserializer_fn(cache_data)
         return {
-            'id': user_data['id'],
-            'name': user_data['name'],
-            'age': user_data['age']
+            'id'    : user_data['id'],
+            'name'  : user_data['name'],
+            'age'   : user_data['age'],
+            'posts' : user_data['posts']
         }
 
 async def main() -> None:
     await generate_cache(cache_redis)
     start       = time.perf_counter()
     all_users   = []
-    for uid in range(1, 10001):
+    # for uid in range(1, 10001):
+    user_population     = 5000
+    for uid in range(1, user_population+1):
         db_user = await fetch_user(uid)
         all_users.append(db_user)
     end     = time.perf_counter()

@@ -9,17 +9,14 @@ from sqlalchemy.engine import Engine
 from sqlalchemy import select
 
 cache_inprocess = TTLCache(maxsize=10_000, ttl=60) 
-db_url          = "sqlite:///data/database.db"
-engine          = create_engine(
-    db_url
-)
+
 Base    = declarative_base()
 class User(Base):
     __tablename__                   = "users"
     id : Mapped[int]                = Column(Integer, primary_key=True)
     name : Mapped[str]              = Column(String)
     age : Mapped[int]               = Column(Integer)
-    posts : Mapped[List["Post"]]    = relationship(back_populates="user")
+    posts : Mapped[List["Post"]]    = relationship(back_populates="user",lazy="selectin")
     
 class Post(Base):
     __tablename__           = "posts"
@@ -42,12 +39,23 @@ def generate_cache(engine : Engine, cache_inprocess : TTLCache) -> None:
                 "age": user.age
             }
             cache_inprocess[cache_key] = data
-            
+        
+DB_USER     = "myuser"
+DB_PW       = "password123"
+DB_HOST     = "localhost"
+PORT_NO     = "5432"
+
+db_url      = f"postgresql+psycopg2://{DB_USER}:{DB_PW}@{DB_HOST}:{PORT_NO}/mydb"
+engine = create_engine(
+    db_url
+)
+
 generate_cache(engine, cache_inprocess)
 start = time.perf_counter()
 all_users = []
 
-for uid in range(1, 10001):
+user_population     = 5000
+for uid in range(1, user_population+1):
     cache_key = f"user-{uid}"
     cache_data = cache_inprocess.get(cache_key)
 
